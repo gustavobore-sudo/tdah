@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDAH Focus - Conectado a Google Sheets</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .sync-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #48bb78;
+        }
+
+        .sync-dot.syncing {
+            background: #ed8936;
+            animation: pulse 1s infinite;
+        }
+
+        .sync-dot.error {
+            background: #f56565;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #718096;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .task-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 60px 30px;
+            border-radius: 16px;
+            margin: 30px 0;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .task-number {
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .task-text {
+            color: white;
+            font-size: 24px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-done {
+            background: #48bb78;
+            color: white;
+            grid-column: span 2;
+            font-size: 18px;
+        }
+
+        .btn-done:hover:not(:disabled) {
+            background: #38a169;
+        }
+
+        .btn-week {
+            background: #edf2f7;
+            color: #4a5568;
+        }
+
+        .btn-week:hover:not(:disabled) {
+            background: #e2e8f0;
+        }
+
+        .btn-someday {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .btn-someday:hover:not(:disabled) {
+            background: #feb2b2;
+        }
+
+        .btn-sync {
+            background: #667eea;
+            color: white;
+            grid-column: span 2;
+            font-size: 14px;
+        }
+
+        .btn-sync:hover:not(:disabled) {
+            background: #5a67d8;
+        }
+
+        .add-task {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+        }
+
+        .add-task input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .add-task input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-add {
+            background: #667eea;
+            color: white;
+            width: 100%;
+        }
+
+        .btn-add:hover:not(:disabled) {
+            background: #5a67d8;
+        }
+
+        .queue-info {
+            text-align: center;
+            margin-top: 20px;
+            padding: 12px;
+            background: #fef5e7;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #975a16;
+        }
+
+        .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            animation: celebrate 0.6s ease-out;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        @keyframes celebrate {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0;
+            }
+        }
+
+        .config-section {
+            background: #fef5e7;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .config-section input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .config-section button {
+            margin-top: 8px;
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sync Indicator -->
+        <div class="sync-indicator">
+            <div class="sync-dot" id="syncDot"></div>
+            <span id="syncStatus">Conectado</span>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1>TDAH Focus</h1>
+            <div class="subtitle">Conectado a Google Sheets</div>
+        </div>
+
+        <!-- Configuración (solo visible si no está configurado) -->
+        <div id="configSection" class="config-section" style="display: none;">
+            <strong>⚙️ Configuración inicial</strong>
+            <p style="font-size: 12px; margin-top: 8px;">
+                Pega la URL de tu Google Apps Script Web App:
+            </p>
+            <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+            <button onclick="saveApiUrl()">Guardar</button>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number" id="completedToday">-</div>
+                <div class="stat-label">Hoy</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="streak">-</div>
+                <div class="stat-label">Racha</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="queueCount">-</div>
+                <div class="stat-label">En Cola</div>
+            </div>
+        </div>
+
+        <!-- Current Task -->
+        <div id="currentTaskContainer">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Cargando tareas...</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="actionButtons" style="display: none;">
+            <div class="buttons">
+                <button class="btn btn-done" onclick="completeTask()" id="btnDone">✓ Completada</button>
+                <button class="btn btn-week" onclick="postponeTask('semana')" id="btnWeek">📅 Esta Semana</button>
+                <button class="btn btn-someday" onclick="postponeTask('algunDia')" id="btnSomeday">🌤️ Algún Día</button>
+                <button class="btn btn-sync" onclick="syncTasks()" id="btnSync">🔄 Sincronizar</button>
+            </div>
+        </div>
+
+        <!-- Add Task -->
+        <div class="add-task">
+            <input type="text" id="taskInput" placeholder="Agregar nueva tarea a HOY..." 
+                   onkeypress="if(event.key==='Enter') addTask()">
+            <button class="btn btn-add" onclick="addTask()" id="btnAdd">+ Agregar Tarea</button>
+        </div>
+
+        <!-- Queue Info -->
+        <div id="queueInfo" class="queue-info" style="display: none;">
+            <!-- Se llena dinámicamente -->
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURACIÓN
+        // ============================================
+        let API_URL = localStorage.getItem('tdah_api_url') || '';
+        
+        // Estado de la aplicación
+        let tasks = {
+            hoy: [],
+            semana: [],
+            algunDia: [],
+            inbox: []
+        };
+        
+        let stats = {
+            completedToday: 0,
+            streak: 0
+        };
+
+        let isLoading = false;
+
+        // ============================================
+        // INICIALIZACIÓN
+        // ============================================
+        function init() {
+            if (!API_URL) {
+                showConfig();
+            } else {
+                syncTasks();
+            }
+        }
+
+        function showConfig() {
+            document.getElementById('configSection').style.display = 'block';
+            document.getElementById('apiUrlInput').value = API_URL;
+        }
+
+        function saveApiUrl() {
+            const url = document.getElementById('apiUrlInput').value.trim();
+            if (!url) {
+                showError('Por favor ingresa una URL válida');
+                return;
+            }
+            
+            API_URL = url;
+            localStorage.setItem('tdah_api_url', url);
+            document.getElementById('configSection').style.display = 'none';
+            syncTasks();
+        }
+
+        // ============================================
+        // SINCRONIZACIÓN CON GOOGLE SHEETS
+        // ============================================
+        async function syncTasks() {
+            if (isLoading) return;
+            
+            setLoading(true);
+            updateSyncStatus('syncing');
+            
+            try {
+                // Obtener tareas
+                const tasksResponse = await fetch(`${API_URL}?action=getTasks`);
+                const tasksData = await tasksResponse.json();
+                
+                if (!tasksData.success) {
+                    throw new Error(tasksData.error || 'Error al cargar tareas');
+                }
+                
+                tasks = tasksData.data;
+                
+                // Obtener stats
+                const statsResponse = await fetch(`${API_URL}?action=getStats`);
+                const statsData = await statsResponse.json();
+                
+                if (statsData.success) {
+                    stats = statsData.data;
+                }
+                
+                updateSyncStatus('success');
+                clearError();
+                render();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('No se pudo conectar con Google Sheets. Verifica la URL en configuración.');
+                updateSyncStatus('error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ============================================
+        // COMPLETAR TAREA
+        // ============================================
+        async function completeTask() {
+            if (tasks.hoy.length === 0 || isLoading) return;
+            
+            const taskText = tasks.hoy[0];
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${API_URL}?action=completeTask`, {
+                    method: 'POST',
+                    body: JSON.stringify({ task: taskText })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al completar tarea');
+                }
+                
+                // Celebración
+                showCelebration();
+                
+                // Actualizar local
+                tasks.hoy.shift();
+                if (data.stats) {
+                    stats = data.stats;
+                }
+                
+                clearError();
+                render();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error al completar tarea. Intenta sincronizar.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ============================================
+        // POSPONER TAREA
+        // ============================================
+        async function postponeTask(moveTo) {
+            if (tasks.hoy.length === 0 || isLoading) return;
+            
+            const taskText = tasks.hoy[0];
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${API_URL}?action=postponeTask`, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        task: taskText,
+                        moveTo: moveTo 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al posponer tarea');
+                }
+                
+                // Actualizar local
+                const task = tasks.hoy.shift();
+                tasks[moveTo].push(task);
+                
+                clearError();
+                render();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error al posponer tarea. Intenta sincronizar.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ============================================
+        // AGREGAR TAREA
+        // ============================================
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const text = input.value.trim();
+            
+            if (!text || isLoading) return;
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${API_URL}?action=addTask`, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        task: text,
+                        addTo: 'hoy'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al agregar tarea');
+                }
+                
+                // Actualizar local
+                tasks.hoy.push(text);
+                input.value = '';
+                
+                clearError();
+                render();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error al agregar tarea. Intenta sincronizar.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ============================================
+        // UI HELPERS
+        // ============================================
+        function setLoading(loading) {
+            isLoading = loading;
+            const buttons = ['btnDone', 'btnWeek', 'btnSomeday', 'btnSync', 'btnAdd'];
+            buttons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = loading;
+            });
+        }
+
+        function updateSyncStatus(status) {
+            const dot = document.getElementById('syncDot');
+            const text = document.getElementById('syncStatus');
+            
+            dot.className = 'sync-dot';
+            
+            switch(status) {
+                case 'syncing':
+                    dot.classList.add('syncing');
+                    text.textContent = 'Sincronizando...';
+                    break;
+                case 'success':
+                    text.textContent = 'Conectado';
+                    break;
+                case 'error':
+                    dot.classList.add('error');
+                    text.textContent = 'Error';
+                    break;
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function clearError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function showCelebration() {
+            const celebration = document.createElement('div');
+            celebration.className = 'celebration';
+            celebration.textContent = ['🎉', '✨', '🌟', '💪', '🔥'][Math.floor(Math.random() * 5)];
+            document.body.appendChild(celebration);
+            
+            setTimeout(() => {
+                celebration.remove();
+            }, 600);
+        }
+
+        // ============================================
+        // RENDER UI
+        // ============================================
+        function render() {
+            // Actualizar stats
+            document.getElementById('completedToday').textContent = stats.completedToday;
+            document.getElementById('streak').textContent = stats.streak;
+            
+            const totalQueue = tasks.hoy.length + tasks.semana.length + tasks.algunDia.length + tasks.inbox.length;
+            document.getElementById('queueCount').textContent = totalQueue;
+            
+            // Tarea actual
+            const container = document.getElementById('currentTaskContainer');
+            const buttons = document.getElementById('actionButtons');
+            
+            if (tasks.hoy.length === 0) {
+                // No hay tareas
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🎯</div>
+                        <h2>Sin tareas pendientes</h2>
+                        <p>¡Agrega una nueva tarea o sincroniza con Google Sheets!</p>
+                    </div>
+                `;
+                buttons.style.display = 'none';
+                
+            } else {
+                // Mostrar tarea actual
+                const currentTask = tasks.hoy[0];
+                container.innerHTML = `
+                    <div class="task-card">
+                        <div class="task-number">Tarea ${tasks.hoy.length === 1 ? 'Única' : '1 de ' + tasks.hoy.length}</div>
+                        <div class="task-text">${currentTask}</div>
+                    </div>
+                `;
+                buttons.style.display = 'block';
+            }
+            
+            // Info de cola
+            const queueInfo = document.getElementById('queueInfo');
+            const queueParts = [];
+            
+            if (tasks.semana.length > 0) queueParts.push(`📅 ${tasks.semana.length} esta semana`);
+            if (tasks.algunDia.length > 0) queueParts.push(`🌤️ ${tasks.algunDia.length} algún día`);
+            if (tasks.inbox.length > 0) queueParts.push(`📥 ${tasks.inbox.length} en inbox`);
+            
+            if (queueParts.length > 0) {
+                queueInfo.style.display = 'block';
+                queueInfo.textContent = queueParts.join(' • ');
+            } else {
+                queueInfo.style.display = 'none';
+            }
+        }
+
+        // ============================================
+        // AUTO-SYNC
+        // ============================================
+        // Sincronizar automáticamente cada 2 minutos
+        setInterval(() => {
+            if (!isLoading) {
+                syncTasks();
+            }
+        }, 120000); // 2 minutos
+
+        // Inicializar
+        init();
+    </script>
+</body>
+</html>
